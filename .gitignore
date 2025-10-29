@@ -1,0 +1,6 @@
+.task_venv/
+__pycache__/
+*.pyc
+.env
+*.sqlite3
+/media/
