@@ -104,12 +104,32 @@ class TaskAPI(viewsets.ViewSet, RoleCheckerMixin):
         logger.info(f"Listing tasks for project: {project_id} by user: {request.user.email}")
         project = get_project(project_id)
         self.check_object_permissions(request, project)
-        
+
         tasks = self.apply_filters(request, get_all_task(project))
-        
+
         page = self.pagination_class.paginate_queryset(tasks, request)
         logger.debug(f"Found {len(page)} tasks for project: {project.name}")
-        
+
+        return self.pagination_class.get_paginated_response({
+            "message": "Success",
+            "data": TaskSerializer(page, many=True).data}
+        )
+
+    def my_tasks(self, request):
+        logger.info(f"Listing my tasks for user: {request.user.email}")
+
+        tasks = self.apply_filters(
+            request,
+            Task.objects.filter(
+                assigned_to=request.user,
+                is_deleted=False,
+                project__is_deleted=False,
+            ).select_related("project", "parent", "assigned_to", "created_by").order_by("-created_at")
+        )
+
+        page = self.pagination_class.paginate_queryset(tasks, request)
+        logger.debug(f"Found {len(page)} tasks assigned to user: {request.user.email}")
+
         return self.pagination_class.get_paginated_response({
             "message": "Success",
             "data": TaskSerializer(page, many=True).data}

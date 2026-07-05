@@ -166,16 +166,22 @@ class ProjectAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         if self.action == "members":
             return ProjectMembershipFilter
         return ProjectFilter
+
+    def get_search_fields(self):
+        if self.action == "members":
+            return ["user__email"]
+        return self.search_fields
     
     def get_ordering_fields(self):
         if self.action == "members":
-            return ["joined_at"]
+            return ["joined_at", "role"]
         return ["created_at"]
     
     def apply_filters(self, request, queryset):
         self.filterset_class = self.get_filterset_class()
         self.ordering_fields = self.get_ordering_fields()
-        
+        self.search_fields = self.get_search_fields()
+
         django_filter = DjangoFilterBackend()
         queryset = django_filter.filter_queryset(request, queryset, self)
         
@@ -475,7 +481,6 @@ class ProjectAPI(viewsets.ModelViewSet, RoleCheckerMixin):
 
     @action(detail=True, methods=["put"])
     def transfer_owner(self, request):
-        import ipdb; ipdb.set_trace()
         project_id = request.query_params.get("project_id")
         email = request.data.get("email")
         logger.info(f"Transferring ownership of project: {project_id} to {email} by user: {request.user.email}")

@@ -6,12 +6,12 @@ TASK_STATUS = [
     ("BLOCKED", "Blocked"),
 ]
 
-TASK_PRIORITY = {
-    "LOW": 1,
-    "MEDIUM": 2,
-    "HIGH": 3,
-    "URGENT": 4,
-}
+TASK_PRIORITY = [
+    ("LOW", "Low"),
+    ("MEDIUM", "Medium"),
+    ("HIGH", "High"),
+    ("URGENT", "Urgent"),
+]
 
 TASK_TYPE = [
     ("BUG", "Bug"),

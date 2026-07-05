@@ -19,8 +19,8 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             "id", "project", "project_name", "parent", "parent_task", "title", "description",
-            "start_date", "due_date", "status", "priority", "task_type", "assigned_to", "assigned_to_email", 
-            "created_by_email"
+            "start_date", "due_date", "status", "priority", "task_type", "assigned_to", "assigned_to_email",
+            "created_by_email", "created_at"
         ]
         
 class TaskCreateSerializer(serializers.ModelSerializer):
