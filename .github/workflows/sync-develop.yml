@@ -7,17 +7,21 @@ on:
   release:
     types: [published, edited]
 
+concurrency:
+  group: sync-develop
+  cancel-in-progress: false
+
 jobs:
   sync-develop:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write      # allows pushing back to repo
-      pull-requests: write # allows creating and merging PRs
+      contents: write      # allows pushing the sync branch
+      pull-requests: write # allows opening the sync PR
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0   # IMPORTANT for merge
 
@@ -26,13 +30,41 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Fetch all branches
-        run: git fetch origin +refs/heads/*:refs/remotes/origin/*
-
-      - name: Merge main → develop
+      - name: Create sync branch from develop
         run: |
           git checkout develop
-          git merge origin/main --no-edit || true
+          git checkout -b sync/main-into-develop
 
-      - name: Push changes to develop
-        run: git push origin develop || true
+      - name: Merge main into sync branch
+        # Intentionally NOT swallowing failures: a real conflict should
+        # fail this job loudly so it gets resolved by hand, instead of
+        # silently leaving develop out of sync.
+        run: git merge origin/main --no-edit
+
+      - name: Check whether develop is already up to date
+        id: diff
+        run: |
+          if git diff --quiet develop sync/main-into-develop; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push sync branch
+        if: steps.diff.outputs.up_to_date == 'false'
+        run: git push origin sync/main-into-develop --force
+
+      - name: Open pull request into develop
+        if: steps.diff.outputs.up_to_date == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh pr list --base develop --head sync/main-into-develop --state open --json number --jq '.[0].number' | grep -q .; then
+            echo "Sync PR already open, branch updated in place."
+          else
+            gh pr create \
+              --base develop \
+              --head sync/main-into-develop \
+              --title "chore: sync main into develop" \
+              --body "Automated sync of \`main\` into \`develop\` after a release or hotfix merge. Review and merge to keep \`develop\` up to date."
+          fi
