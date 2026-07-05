@@ -25,7 +25,7 @@ def send_project_invite(*, project, user, invited_by, role):
         logger.warning(f"User {user.email} already a member of project: {project.name}")
         raise ValidationError("User already a member")
 
-    if role not in PROJECT_ROLES:
+    if role not in [r[0] for r in PROJECT_ROLES]:
         logger.error(f"Invalid role '{role}' provided for project invite to {user.email}")
         raise ValidationError("Invalid role specified")
     

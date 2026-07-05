@@ -6,7 +6,8 @@ class TaskFilter(django_filters.FilterSet):
     priority = django_filters.CharFilter()
     assigned_to = django_filters.UUIDFilter(field_name="assigned_to_id")
     parent = django_filters.UUIDFilter(field_name="parent_id")
-    
+    project = django_filters.UUIDFilter(field_name="project_id")
+
     class Meta:
         model = Task
-        fields = ["status", "priority", "assigned_to", "parent"]
+        fields = ["status", "priority", "assigned_to", "parent", "project"]

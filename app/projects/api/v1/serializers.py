@@ -21,7 +21,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id", "name", "description", "organization", "organization_name",
-            "team", "team_name", "status", "created_by", "created_by_email", "member_count"
+            "team", "team_name", "status", "created_by", "created_by_email", "member_count",
+            "created_at"
         ]
         
     def get_member_count(self, obj):
