@@ -147,6 +147,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB = int(os.getenv("REDIS_DB", 0))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
+
 # Initialize Redis client as a Django setting so services can access it via settings.redis_client
 logger.info(f"Initializing Redis client: host={REDIS_HOST}, port={REDIS_PORT}, db={REDIS_DB}")
 REDIS_CLIENT = redis.StrictRedis(
@@ -154,7 +155,8 @@ REDIS_CLIENT = redis.StrictRedis(
     port=REDIS_PORT,
     db=REDIS_DB,
     password=REDIS_PASSWORD,
-    decode_responses=True
+    decode_responses=True,
+    protocol=2,
 )
 logger.info("Redis client initialized successfully")
 

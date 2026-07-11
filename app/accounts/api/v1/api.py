@@ -43,13 +43,13 @@ class RegisterAPI(CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        refresh = login_user(user)
+        refresh, access = login_user(user)
         logger.info(f"User registered successfully: {user.email}")
         return Response({
             "message": "User created successfully",
             "user": UserSerializer(user).data,
             "refresh": str(refresh),
-            "access": str(refresh.access_token),},
+            "access": str(access),},
             status=status.HTTP_201_CREATED,
         )
 
@@ -235,13 +235,13 @@ class OTPLoginAPI(APIView):
             serializer.validated_data["kind"],
         )
 
-        refresh = login_user(user)
+        refresh, access = login_user(user)
         logger.info(f"User logged in via OTP: {user.email}")
         return Response({
             "message": "User logged in successfully",
             "user": UserSerializer(user).data,
             "refresh": str(refresh),
-            "access": str(refresh.access_token),}, 
+            "access": str(access),},
             status=status.HTTP_200_OK
         )
 

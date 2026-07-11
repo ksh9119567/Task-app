@@ -102,34 +102,33 @@ class ProjectAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         return True
     
     def check_user_permission(self, user, id):
-        if self.action == "create" and id is not None:
-            try:
-                org = get_org_membership(id, user).organization
-                if org.settings.allow_project_creation == False:
-                    raise ValidationError("You are not allowed to create projects in this organization.")
-                
-                role = get_org_role(user, org)
-                hierarchy = ORG_ROLE_HIERARCHY
-                min_role_required = org.settings.create_project_min_role
-            except NotFound as e:
-                try:    
-                    team = get_team_membership(id, user).team
-                    if team.settings.allow_project_creation == False:
-                        raise ValidationError("You are not allowed to create projects in this team.")
-                    
-                    role = get_team_role(user, team)
-                    hierarchy = TEAM_ROLE_HIERARCHY
-                    min_role_required = team.settings.create_project_min_role
-                except NotFound as e:
-                    return True
-            finally:
-                if not self.has_minimum_role(role, min_role_required, hierarchy):
-                    raise ValidationError(f"You must have at least {min_role_required} role to perform this action.")
-                
-                return True
-        
-        else:
+        if self.action != "create" or id is None:
             return True
+
+        # Resolve the scope (organization first, then team) and the acting role.
+        try:
+            org = get_org_membership(id, user).organization
+            role = get_org_role(user, org)
+            hierarchy = ORG_ROLE_HIERARCHY
+            min_role_required = org.settings.create_project_min_role
+            # The flag gates non-owners only; the owner can always create.
+            if role != "OWNER" and org.settings.allow_project_creation == False:
+                raise ValidationError("You are not allowed to create projects in this organization.")
+        except NotFound:
+            try:
+                team = get_team_membership(id, user).team
+                role = get_team_role(user, team)
+                hierarchy = TEAM_ROLE_HIERARCHY
+                min_role_required = team.settings.create_project_min_role
+                if role != "OWNER" and team.settings.allow_project_creation == False:
+                    raise ValidationError("You are not allowed to create projects in this team.")
+            except NotFound:
+                return True
+
+        if not self.has_minimum_role(role, min_role_required, hierarchy):
+            raise ValidationError(f"You must have at least {min_role_required} role to perform this action.")
+
+        return True
             
     
     def check_user_project_permission(self, user, project):

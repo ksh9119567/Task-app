@@ -99,20 +99,21 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         if self.action == "create" and org_id is not None:
             try:
                 org = get_org_membership(org_id, user).organization
-                if org.settings.allow_team_creation == False:
-                    raise ValidationError("You are not allowed to create teams in this organization.")
-                
-                org_role = get_org_role(user, org)
-                min_role_required = org.settings.create_team_min_role
-                
-                if not self.has_minimum_role(org_role, min_role_required, ORG_ROLE_HIERARCHY):
-                    raise ValidationError(f"You must have at least {min_role_required} role to perform this action.")
-                
-                return True
-                
             except NotFound as e:
                 raise NotFound("Either Organization does not exist or you are not a member of it.")
-            
+
+            org_role = get_org_role(user, org)
+            min_role_required = org.settings.create_team_min_role
+
+            # The flag gates non-owners only; the owner can always create.
+            if org_role != "OWNER" and org.settings.allow_team_creation == False:
+                raise ValidationError("You are not allowed to create teams in this organization.")
+
+            if not self.has_minimum_role(org_role, min_role_required, ORG_ROLE_HIERARCHY):
+                raise ValidationError(f"You must have at least {min_role_required} role to perform this action.")
+
+            return True
+
         else:
             return True
     
@@ -350,7 +351,6 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
     @action(detail=True, methods=["post"])
     def accept_invite(self, request):
         logger.info(f"Accepting team invite for user: {request.user.email}")
-        import ipdb; ipdb.set_trace()
         invite_token = request.query_params.get('invite_token')
         
         response = verify_invite_token(request_user=request.user, invite_type="team", token=invite_token)

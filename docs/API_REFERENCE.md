@@ -255,15 +255,17 @@ Authorization: Bearer <access_token>
 | Method | Endpoint | Description |
 |---------|-----------|-------------|
 | GET  | `/tasks/get-project-tasks/` | List all tasks in a project (paginated) |
+| GET  | `/tasks/get-my-tasks/` | List tasks assigned to the current user across all projects |
 | POST | `/tasks/create-task/` | Create a new task |
 | GET  | `/tasks/get_task_details/` | Get task details |
 | PUT  | `/tasks/update-task/` | Update task details |
 | DELETE | `/tasks/delete-task/` | Delete task (creator/manager only) |
 
 **Query Parameters:**
-- `project_id` - Project ID (required)
+- `project_id` - Project ID (required for `get-project-tasks/`)
 - `status` - Filter by status (TO_DO, IN_PROGRESS, REVIEW, DONE, BLOCKED)
 - `priority` - Filter by priority (LOW, MEDIUM, HIGH, URGENT)
+- `task_type` - Filter by type (BUG, FEATURE, IMPROVEMENT, DOCUMENTATION)
 - `assigned_to` - Filter by assignee UUID
 - `parent_id` - Filter by parent task UUID (for subtasks)
 - `search` - Search in title and description

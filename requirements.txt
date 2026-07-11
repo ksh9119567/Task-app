@@ -6,6 +6,6 @@ psycopg2-binary
 python-dotenv
 Pillow
 ipython
-redis
+redis==5.0.8
 ipdb
 celery

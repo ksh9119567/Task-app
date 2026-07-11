@@ -120,7 +120,7 @@ class GovernanceAPI(viewsets.ModelViewSet):
     def update_team_settings(self, request):
         team_id = request.query_params.get("team_id")
         logger.info(f"Updating team settings for user: {request.user.email}")
-        team = get_org(team_id)
+        team = get_team(team_id)
         self.check_object_permissions(request, team)
         team_settings = team.settings
         
@@ -146,7 +146,7 @@ class GovernanceAPI(viewsets.ModelViewSet):
     def update_project_settings(self, request):
         project_id = request.query_params.get("project_id")
         logger.info(f"Updating project settings for user: {request.user.email}")
-        project = get_org(project_id)
+        project = get_project(project_id)
         self.check_object_permissions(request, project)
         project_settings = project.settings
         
