@@ -56,11 +56,12 @@ Structra follows a **Governance-Oriented Modular Monolith** design.
     ├── teams/           # Team management
     ├── projects/        # Project boundaries & RBAC rules
     ├── tasks/           # Task & subtask execution
-    ├── sprints/         # Sprint planning
-    └── comments/        # Comments & discussion layer
+    ├── governance/      # Configurable settings & policy resolution engine
+    ├── sprints/         # Sprint planning (scaffolded — not yet implemented)
+    └── comments/        # Comments & discussion layer (scaffolded — not yet implemented)
 
-    core/                # Role hierarchy, policy engine, permissions
-    services/            # Business logic layer
+    core/                # Role hierarchy, policy engine, permissions, activity logging
+    services/            # Business logic layer (token store, etc.)
     config/              # Django settings
     docs/                # Documentation
     scripts/             # Utility scripts
@@ -107,40 +108,59 @@ Structra follows a **Governance-Oriented Modular Monolith** design.
 
 # 🚀 Current Features
 
-### Governance Layer
+> ✅ = implemented & available · 🔜 = scaffolded / planned (see Roadmap)
 
--   Single-owner model per entity
--   Transferable ownership
+### Accounts & Identity ✅
+
+-   Custom email-based user model with soft delete
+-   JWT authentication (access + refresh) with Redis-backed token store & revocation
+-   OTP generation/verification (email) and OTP login
+-   Forgot-password flow (request → verify → reset)
+-   Profile management (name, username, phone, profile picture)
+-   Asynchronous email delivery via Celery (OTP & invites, with retries)
+
+### Governance Layer ✅
+
+-   Single-owner model per entity with transferable ownership
 -   Admin / Manager delegation
--   Approval-based member workflows
--   Configurable role thresholds (min/max policy model)
+-   Configurable role thresholds (min/max policy model) per org / team / project
+-   Auto-created settings objects with sensible defaults (via signals)
+-   Rules engine resolving effective policies, including inheritance (project ← team ← org)
+-   🔜 Approval **workflow** engine (settings flags exist today; request/approve/reject queue not yet built)
 
-### Organization & Team Management
+### Organization & Team Management ✅
 
--   Structured hierarchy management
+-   Structured hierarchy management (Org → Team → Project)
+-   Full CRUD + membership: invite (email token), accept, update role, remove, self-remove, transfer ownership
 -   Team-to-project mapping
 -   Governance protection against orphaned entities
 
-### Project & Task System
+### Project & Task System ✅
 
--   Self-referential subtask architecture
--   Assignee-based update overrides
--   Configurable create/update/delete policies
--   Activity tracking & audit logs
+-   Project lifecycle status (Planning / Active / On Hold / Completed / Archived)
+-   Full task CRUD with status, priority, type, dates & assignee
+-   Self-referential subtask architecture (one level)
+-   "My Tasks" cross-project view
+-   Filtering, search, sorting & pagination
+-   Configurable create/update/delete policies (governed by Project settings)
 
-### Productivity & Planning
+### Activity & Audit ✅
 
--   Sprint module
--   Task tracking
--   Timeline-ready architecture
--   Performance tracking foundation
+-   Automatic activity tracking of all API requests via middleware
+-   Audit log with who/what/when/where, action stats & my-activity feed
+-   Sensitive-field redaction and automatic log cleanup command
 
-### Infrastructure
+### Productivity & Planning 🔜
 
--   Dockerized environment
--   Redis integration
--   Celery background jobs
+-   Sprint module (scaffolded — not yet implemented)
+-   Timeline / burndown / workload analytics (planned)
+
+### Infrastructure ✅
+
+-   Dockerized environment (Postgres + Redis + Celery)
+-   Redis integration & Celery background jobs
 -   Centralized permission engine
+-   Soft-delete lifecycle across users, orgs, teams, projects, tasks
 
 ------------------------------------------------------------------------
 
@@ -151,30 +171,36 @@ Structra follows a **Governance-Oriented Modular Monolith** design.
 -   Configurable min/max role policies
 -   Self-removal safeguards
 -   Ownership transfer flow
--   Approval workflow layer
+-   Settings inheritance & rules-resolution engine
 
-## Phase 2 --- Collaboration Layer (In Progress)
+## Phase 2 --- Core Work Management (Completed)
 
--   Project chat
--   Team chat
--   Org announcements
--   Comment system expansion
+-   Projects CRUD, membership & lifecycle status
+-   Tasks CRUD, subtasks, assignment, filtering & "My Tasks"
+-   Automatic activity tracking & audit logs
 
-## Phase 3 --- Sprint & Productivity
+## Phase 3 --- Approval & Collaboration Layer (In Progress)
+
+-   Approval **workflow** engine (turn governance flags into request/approve/reject queues)
+-   Comment system (task & project discussions)
+-   Notifications (assignments, mentions, invites, due dates)
+-   Project / team chat & org announcements
+
+## Phase 4 --- Sprint & Productivity
 
 -   Sprint lifecycle management
 -   Velocity tracking
 -   Burndown reports
 -   Workload analytics
 
-## Phase 4 --- Subscription & Scale
+## Phase 5 --- Subscription & Scale
 
 -   Plan-based feature flags
 -   Usage-based limits
 -   Stripe integration
 -   Rate limiting
 
-## Phase 5 --- Infrastructure Hardening
+## Phase 6 --- Infrastructure Hardening
 
 -   Redis caching layers
 -   Audit logs (enterprise)
@@ -203,7 +229,10 @@ All APIs are versioned and modular:
     /api/v1/teams/
     /api/v1/projects/
     /api/v1/tasks/
+    /api/v1/governance/
+    /api/v1/activity-logs/
 
+See [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) for the full endpoint catalog.
 Future API versions can coexist without breaking backward compatibility.
 
 ------------------------------------------------------------------------
@@ -255,4 +284,4 @@ If you find Structra valuable, consider starring the repository ⭐
 ------------------------------------------------------------------------
 
 **Status:** Active Development\
-**Last Updated:** February 2026
+**Last Updated:** July 2026

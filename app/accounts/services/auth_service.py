@@ -15,7 +15,7 @@ def login_user(user):
     store_refresh_token(user.id, str(refresh))
     store_access_token(user.id, str(access))
     logger.info(f"User logged in successfully: {user.email}")
-    return refresh
+    return refresh, access
 
 
 def logout_user(*, refresh_token, access_token, request_user):
