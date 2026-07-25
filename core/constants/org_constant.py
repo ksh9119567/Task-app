@@ -1,3 +1,5 @@
+from core.constants.role_ladder import build_hierarchy
+
 ORG_ROLES = [
     ("OWNER", "Owner"),            # Root-level access, created the org
     ("ADMIN", "Admin"),            # Full control except deleting org
@@ -6,13 +8,7 @@ ORG_ROLES = [
     ("VIEWER", "Viewer"),          # Read-only access
 ]
 
-ORG_ROLE_HIERARCHY = {
-    "OWNER": 5,
-    "ADMIN": 4,
-    "MANAGER": 3,
-    "MEMBER": 2,
-    "VIEWER": 1,
-}
+ORG_ROLE_HIERARCHY = build_hierarchy(ORG_ROLES)
 
 ORG_ACTION_POLICIES = {
     "invite_member": {

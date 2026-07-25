@@ -18,14 +18,14 @@ def send_team_invite(*, team, user, invited_by, role):
     """
     logger.info(f"Sending team invite to {user.email} for team: {team.name}")
 
-    if team.settings.max_members == team.memberships.count():
-            raise ValidationError("Team has reached maximum member limit.")
+    if team.memberships.count() >= team.settings.max_members:
+        raise ValidationError("Team has reached maximum member limit.")
 
     if TeamMembership.objects.filter(team=team, user=user).exists():
         logger.warning(f"User {user.email} already a member of team: {team.name}")
         raise ValidationError("User already a member")
 
-    if role not in TEAM_ROLES:
+    if role not in [r[0] for r in TEAM_ROLES]:
         logger.error(f"Invalid role '{role}' provided for team invite to {user.email}")
         raise ValidationError("Invalid role specified")
 

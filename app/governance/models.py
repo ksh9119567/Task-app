@@ -152,21 +152,25 @@ class ProjectSettings(BaseSettings):
     
     # Default roles
     default_member_role = models.CharField(
-        max_length=20, default="MEMBER",
+        max_length=20, default="CONTRIBUTOR",
         choices=project_constant.PROJECT_ROLES
-    )                                                    
-    
+    )
+
     # Role_based permissions
+    # Note: PROJECT_ROLES now includes GUEST (rank floor, for external
+    # collaborators - see Phase B of the Org/Team/Project improvements doc).
+    # It's a technically-valid but not especially meaningful floor for
+    # these config fields; narrowing their choices is a separate decision.
     invite_member_min_role = models.CharField(
-        max_length=20, default="MANAGER", 
+        max_length=20, default="MANAGER",
         choices=project_constant.PROJECT_ROLES
     )
     update_member_min_role = models.CharField(
-        max_length=20, default="MANAGER", 
+        max_length=20, default="MANAGER",
         choices=project_constant.PROJECT_ROLES
     )
     remove_member_min_role = models.CharField(
-        max_length=20, default="MANAGER", 
+        max_length=20, default="MANAGER",
         choices=project_constant.PROJECT_ROLES
     )
     

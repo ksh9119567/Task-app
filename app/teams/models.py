@@ -36,12 +36,23 @@ class Team(TimeStampedModel):
     )
     
     is_deleted = models.BooleanField(default=False)  # Soft delete flag
-    
+
     class Meta:
         ordering = ("name", )
-    
+
     def __str__(self):
         return self.name
+
+    @property
+    def projects(self):
+        """
+        Projects this team is assigned to via a ProjectTeam link. Replaces
+        the old `related_name="projects"` reverse accessor from Project's
+        now-removed `team` ForeignKey - kept as a property so existing call
+        sites (team.projects.count(), etc.) don't need to change.
+        """
+        from app.projects.models import Project
+        return Project.objects.filter(team_links__team=self, is_deleted=False)
 
 
 class TeamMembership(TimeStampedModel):

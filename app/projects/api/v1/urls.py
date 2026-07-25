@@ -17,4 +17,9 @@ urlpatterns = [
     path('remove-member/', ProjectAPI.as_view({'delete': 'remove_member'}), name='project_remove_member'),
     path('transfer-owner/', ProjectAPI.as_view({'put': 'transfer_owner'}), name='project_transfer_owner'),
     path('delete-project/', ProjectAPI.as_view({'delete': 'destroy'}), name='project_delete'),
+    path('get-project-teams/', ProjectAPI.as_view({'get': 'teams'}), name='project_teams'),
+    path('get-stale-members/', ProjectAPI.as_view({'get': 'stale_members'}), name='project_stale_members'),
+    path('assign-team/', ProjectAPI.as_view({'post': 'assign_team'}), name='project_assign_team'),
+    path('update-team-role/', ProjectAPI.as_view({'put': 'update_team_role'}), name='project_update_team_role'),
+    path('unassign-team/', ProjectAPI.as_view({'delete': 'unassign_team'}), name='project_unassign_team'),
 ]

@@ -16,9 +16,11 @@ from app.tasks.api.v1.serializers import (
 from app.tasks.services.task_service import delete_task
 from app.tasks.filters import TaskFilter
 
-from core.constants.project_constant import PROJECT_ROLE_HIERARCHY
+from core.constants.project_constant import PROJECT_ROLE_HIERARCHY, PROJECT_ACTION_POLICIES
 from core.pagination import StandardPagination
-from core.permissions.base import get_project_role
+from core.permissions.resolver import effective_role
+
+from app.governance.services.rules_engine import GovernanceResolver
 from core.permissions.mixins import RoleCheckerMixin
 from core.permissions.project import IsProjectMember, IsProjectManager, IsProjectOwner
 from core.utils.task_utils import get_task, get_all_task
@@ -52,28 +54,32 @@ class TaskAPI(viewsets.ViewSet, RoleCheckerMixin):
             if request.user == task.created_by or request.user == task.assigned_to:
                 return True
             
-        role = get_project_role(request.user, project)
-        
+        role = effective_role(request.user, project)
+
         if role == "OWNER":
             return True
         elif self.action == "create":
             if project.settings.allow_task_creation == False:
                 raise PermissionDenied("You are not allowed to create tasks.")
-            
-            minimum_role = project.settings.create_task_min_role
+
+            policy_action = "create_task"
         elif self.action == "update":
             if project.settings.allow_task_updates == False:
                 raise PermissionDenied("You are not allowed to update tasks.")
-            
-            minimum_role = project.settings.update_task_min_role
+
+            policy_action = "update_task"
         elif self.action == "destroy":
             if project.settings.allow_task_deletions == False:
                 raise PermissionDenied("You are not allowed to delete tasks.")
-            
-            minimum_role = project.settings.delete_task_min_role
+
+            policy_action = "delete_task"
         else:
             return
-            
+
+        # Clamp the configured minimum role to the action's system min/max bounds.
+        minimum_role = GovernanceResolver.resolve_action_min_role(
+            project.settings, policy_action, PROJECT_ACTION_POLICIES, PROJECT_ROLE_HIERARCHY
+        )
         if not self.has_minimum_role(role, minimum_role, PROJECT_ROLE_HIERARCHY):
             raise PermissionDenied(f"You must have at least {minimum_role} role to perform this action.")
         else:

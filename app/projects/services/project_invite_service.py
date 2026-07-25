@@ -8,6 +8,7 @@ from services.invite_token_service import store_invite_token
 from services.notification_services import send_invite_email
 
 from core.constants.project_constant import PROJECT_ROLES
+from core.utils.project_utils import count_explicit_members
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,11 @@ def send_project_invite(*, project, user, invited_by, role):
     Create invite token and send project invite email
     """
     logger.info(f"Sending project invite to {user.email} for project: {project.name}")
-    
-    if project.settings.max_members == project.memberships.count():
-            raise ValidationError("Project has reached maximum member limit.")
-        
+
+    if count_explicit_members(project) >= project.settings.max_members:
+        raise ValidationError("Project has reached maximum member limit.")
+
+
     if ProjectMembership.objects.filter(project=project, user=user).exists():
         logger.warning(f"User {user.email} already a member of project: {project.name}")
         raise ValidationError("User already a member")

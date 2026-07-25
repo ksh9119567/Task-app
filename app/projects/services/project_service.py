@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from app.projects.models import ProjectMembership
 from app.organizations.models import OrganizationMembership
+from core.permissions.resolver import is_governance_backstop
 
 logger = logging.getLogger(__name__)
 
@@ -14,17 +15,9 @@ def transfer_project_ownership(*, project, new_owner, performed_by):
     """
     logger.info(f"Transferring ownership of project: {project.name} to {new_owner.email}")
 
-    if project.created_by != performed_by:
-        if project.organization and project.organization.owner != performed_by:
-            logger.warning(f"Non-project creator and Non-organization owner {performed_by.email} attempted to transfer ownership of project: {project.name}")
-            raise PermissionDenied("Only project creator or organization owner can transfer ownership")
-        
-        if project.team and project.team.created_by != performed_by:
-            logger.warning(f"Non-project creator and Non-team creator {performed_by.email} attempted to transfer ownership of project: {project.name}")
-            raise PermissionDenied("Only project creator or team creator can transfer ownership")
-            
-        logger.warning(f"Non-creator {performed_by.email} attempted to transfer ownership of project: {project.name}")
-        raise PermissionDenied("Only project creator can transfer ownership")
+    if project.created_by != performed_by and not is_governance_backstop(performed_by, project):
+        logger.warning(f"Unauthorized ownership transfer attempt by {performed_by.email} for project: {project.name}")
+        raise PermissionDenied("Only the project creator or a governance backstop (org/owning-team owner) can transfer ownership")
 
     if new_owner == project.created_by:
         logger.warning(f"Attempt to transfer ownership to current creator for project: {project.name}")
