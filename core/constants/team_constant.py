@@ -1,3 +1,5 @@
+from core.constants.role_ladder import build_hierarchy
+
 TEAM_ROLES = [
     ("OWNER", "Owner"),             # Root-level access
     ("MANAGER", "Manager"),        # Manages team, invites members
@@ -6,13 +8,7 @@ TEAM_ROLES = [
     ("VIEWER", "Viewer"),          # Read-only
 ]
 
-TEAM_ROLE_HIERARCHY = {
-    "OWNER": 5,
-    "MANAGER": 4,
-    "LEAD": 3,
-    "MEMBER": 2,
-    "VIEWER": 1,
-}
+TEAM_ROLE_HIERARCHY = build_hierarchy(TEAM_ROLES)
 
 TEAM_ACTION_POLICIES = {
     "invite_member": {

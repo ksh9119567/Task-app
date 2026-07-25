@@ -32,10 +32,12 @@ from core.utils.base_utils import get_user, add_member
 from core.utils.org_utils import get_org, get_org_membership
 from core.utils.team_utils import get_team, get_all_team_memberships, get_team_membership
 from core.pagination import StandardPagination
-from core.constants.team_constant import TEAM_ROLE_HIERARCHY
+from core.constants.team_constant import TEAM_ROLE_HIERARCHY, TEAM_ACTION_POLICIES
 from core.constants.org_constant import ORG_ROLE_HIERARCHY
 from core.permissions.base import get_team_role, get_org_role
-from core.permissions.mixins import RoleCheckerMixin
+
+from app.governance.services.rules_engine import GovernanceResolver
+from core.permissions.mixins import RoleCheckerMixin, EnforceObjectPermissionsMixin
 from core.permissions.organization import IsOrganizationPart
 from core.permissions.team import IsTeamMember
 from core.permissions.combined import IsOrgOwnerOrTeamManager, IsOrgOwnerOrTeamOwner
@@ -43,7 +45,7 @@ from core.permissions.combined import IsOrgOwnerOrTeamManager, IsOrgOwnerOrTeamO
 logger = logging.getLogger(__name__)
 
 
-class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
+class TeamAPI(EnforceObjectPermissionsMixin, RoleCheckerMixin, viewsets.ViewSet):
     """
     Team API (v1)
     """
@@ -67,6 +69,18 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         
         return [permission() for permission in permissions]
     
+    def get_permission_object(self):
+        if self.action == "org_teams":
+            return get_org(self.request.query_params.get("org_id"))
+        # update/destroy/send_invite/remove_member all take team_id in the
+        # request body, not as a query param — must match the action bodies
+        # below or the automatic check resolves team=None and denies wrongly.
+        if self.action in ["update", "destroy", "send_invite", "remove_member"]:
+            team_id = self.request.data.get("team_id")
+        else:
+            team_id = self.request.query_params.get("team_id")
+        return get_team(team_id)
+    
     def check_role_permissions(self, request, team):
         role = get_team_role(request.user, team)
         
@@ -75,24 +89,28 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         elif self.action == "send_invite":
             if team.settings.allow_member_invites == False:
                 raise ValidationError("You are not allowed to invite members.")
-            
-            min_role_required = team.settings.invite_member_min_role
+
+            policy_action = "invite_member"
         elif self.action == "update_member":
             if team.settings.allow_member_updates == False:
                 raise ValidationError("You are not allowed to update members.")
-            
-            min_role_required = team.settings.update_member_min_role
+
+            policy_action = "update_member"
         elif self.action == "remove_member":
             if team.settings.allow_member_removal == False:
                 raise ValidationError("You are not allowed to remove members.")
-            
-            min_role_required = team.settings.remove_member_min_role
+
+            policy_action = "remove_member"
         else:
             return
-        
+
+        # Clamp the configured minimum role to the action's system min/max bounds.
+        min_role_required = GovernanceResolver.resolve_action_min_role(
+            team.settings, policy_action, TEAM_ACTION_POLICIES, TEAM_ROLE_HIERARCHY
+        )
         if not self.has_minimum_role(role, min_role_required, TEAM_ROLE_HIERARCHY):
             raise ValidationError(f"You must have at least {min_role_required} role to perform this action.")
-        
+
         return True
     
     def check_user_permission(self, org_id, user):
@@ -214,8 +232,7 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
     def update(self, request):
         team_id = request.data.get("team_id")
         logger.info(f"Updating team: {team_id} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
+        team = self.permission_object
 
         serializer_class = self.get_serializer_class()
         serializer = serializer_class(
@@ -238,8 +255,7 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
     def destroy(self, request):
         team_id = request.data.get("team_id")
         logger.info(f"Deleting team: {team_id} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
+        team = self.permission_object
 
         delete_team(
             team=team,
@@ -257,10 +273,9 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
     # --------------------------------------------------
     @action(detail=True, methods=["get"])
     def org_teams(self, request):
-        org = get_org(request.query_params.get("org_id"))
+        org = self.permission_object
         logger.info(f"Gettings all teams for that org: {org.name}")
         teams = Team.objects.filter(organization=org, is_deleted=False)
-        self.check_object_permissions(request, org)
         
         page = self.pagination_class.paginate_queryset(teams, request)
         logger.debug(f'Found {len(page)} teams for org: {org.name}')
@@ -291,8 +306,7 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
     def self_remove_member(self, request):
         team_id = request.query_params.get("team_id")
         logger.info(f"Self-remove from team: {team_id} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
+        team = self.permission_object
 
         self_remove_team_member(
             team=team,
@@ -310,9 +324,8 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         team_id = request.data.get("team_id")
         email = request.data.get("email")
         logger.info(f"Sending invite to {email} for team: {team_id} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
-        
+        team = self.permission_object
+
         is_org_owner = False
         if team.organization_id:
             org = get_org_membership(team.organization_id, request.user).organization
@@ -368,9 +381,8 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         team_id = request.query_params.get("team_id")
         email = request.data.get("email")
         logger.info(f"Updating member {email} in team: {team_id} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
-        
+        team = self.permission_object
+
         is_org_owner = False
         if team.organization_id:
             org = get_org_membership(team.organization_id, request.user).organization
@@ -413,9 +425,8 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         team_id = request.data.get("team_id")
         email = request.data.get("email")
         logger.info(f"Removing member {email} from team: {team_id} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
-        
+        team = self.permission_object
+
         is_org_owner = False
         if team.organization_id:
             org = get_org_membership(team.organization_id, request.user).organization
@@ -446,8 +457,7 @@ class TeamAPI(viewsets.ViewSet, RoleCheckerMixin):
         team_id = request.query_params.get("team_id")
         email = request.data.get("email")
         logger.info(f"Transferring manager of team: {team_id} to {email} by user: {request.user.email}")
-        team = get_team(team_id)
-        self.check_object_permissions(request, team)
+        team = self.permission_object
 
         new_owner = get_user(email, kind="email")
         if not new_owner:

@@ -18,14 +18,14 @@ def send_organization_invite(*, organization, user, invited_by, role):
     """
     logger.info(f"Sending organization invite to {user.email} for org: {organization.name}")
     
-    if organization.settings.max_members == organization.memberships.count():
-            raise ValidationError("Organization has reached maximum member limit.")
-        
+    if organization.memberships.count() >= organization.settings.max_members:
+        raise ValidationError("Organization has reached maximum member limit.")
+
     if OrganizationMembership.objects.filter(organization=organization, user=user).exists():
         logger.warning(f"User {user.email} already a member of org: {organization.name}")
         raise ValidationError("User already a member")
 
-    if role not in ORG_ROLES:
+    if role not in [r[0] for r in ORG_ROLES]:
         logger.error(f"Invalid role '{role}' provide for organization invite to {user.email}")
         raise ValidationError("Invalid role specified")
 

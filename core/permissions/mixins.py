@@ -1,4 +1,5 @@
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import BasePermission
 
 
 class RoleCheckerMixin:
@@ -15,6 +16,33 @@ class RoleCheckerMixin:
             return False
         return user_rank >= required_rank
 
+
+class EnforceObjectPermissionsMixin:
+    # Set on `self` once resolved, so action bodies can reuse it instead of
+    # re-fetching the same org/team/project a second time.
+    permission_object = None
+
+    def get_permission_object(self):
+        """
+        Return the object to check object-level permissions against for the
+        current action. Only called when a configured permission class for
+        this action actually needs one. May return None (e.g. missing id
+        param) — that's fine, has_object_permission() must handle None safely.
+        """
+        raise NotImplementedError
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+
+        needs_object_check = any(
+            type(perm).has_object_permission is not BasePermission.has_object_permission
+            for perm in self.get_permissions()
+        )
+        if needs_object_check:
+            self.permission_object = self.get_permission_object()
+            self.check_object_permissions(request, self.permission_object)
+
+        
 
 class OrganizationPermissionMixin:
     """

@@ -32,12 +32,9 @@ def get_org_membership(org_id, user):
     """
     if org_id and user:
         try:
-            obj = OrganizationMembership.objects.get(organization_id=org_id, user=user)
-            if not obj:
-                raise NotFound("Organization not found")
-            return obj
-        except Exception as e:
-            raise Exception(e)
+            return OrganizationMembership.objects.get(organization_id=org_id, user=user)
+        except OrganizationMembership.DoesNotExist:
+            raise NotFound("Organization membership not found")
     raise ValidationError("Organization ID and user are required")
 
 def get_all_org_memberships(org_id):

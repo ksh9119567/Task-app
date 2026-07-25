@@ -5,7 +5,7 @@ from app.tasks.models import Task
 from app.projects.models import Project
 from app.accounts.models import User
 
-from core.permissions.base import get_project_role
+from core.permissions.resolver import effective_role
 from core.constants.project_constant import PROJECT_ROLE_HIERARCHY
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -50,7 +50,7 @@ class TaskCreateSerializer(serializers.ModelSerializer):
                 except Task.DoesNotExist:
                     raise serializers.ValidationError("Parent task not found.")
                 
-                role = get_project_role(request.user, parent_task.project)
+                role = effective_role(request.user, parent_task.project)
                 if parent_task.assigned_to != request.user or parent_task.created_by != request.user or project.created_by != request.user:
                     raise serializers.ValidationError("You do not have permission to create a subtask in this project.")
                 
@@ -61,8 +61,8 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         
         attrs["project"] = project
         
-        role = get_project_role(request.user, project)
-        if PROJECT_ROLE_HIERARCHY[role] < PROJECT_ROLE_HIERARCHY[min_role]:
+        role = effective_role(request.user, project)
+        if PROJECT_ROLE_HIERARCHY.get(role, -1) < PROJECT_ROLE_HIERARCHY[min_role]:
             raise serializers.ValidationError("You do not have permission to create a task in this project.")
         
         return attrs
@@ -89,22 +89,23 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         validated_data.pop('created_by', None)
         user = self.context["request"].user
         
-        user_role = get_project_role(user, instance.project)
+        user_role = effective_role(user, instance.project)
         min_role = instance.project.settings.update_task_min_role
-        
+
         if instance.assigned_to:
             # if request user is not creator or assigned_to, raise permission denied
-            if user != instance.created_by and user != instance.assigned_to and PROJECT_ROLE_HIERARCHY[user_role] < PROJECT_ROLE_HIERARCHY[min_role]:
+            if user != instance.created_by and user != instance.assigned_to and PROJECT_ROLE_HIERARCHY.get(user_role, -1) < PROJECT_ROLE_HIERARCHY[min_role]:
                 raise serializers.ValidationError("You do not have permission to update this task.")
         else:
-            if user != instance.created_by and PROJECT_ROLE_HIERARCHY[user_role] < PROJECT_ROLE_HIERARCHY[min_role]:
+            if user != instance.created_by and PROJECT_ROLE_HIERARCHY.get(user_role, -1) < PROJECT_ROLE_HIERARCHY[min_role]:
                 raise serializers.ValidationError("You do not have permission to update this task.")
-                
-        # If assigned_to is being set, ensure the user is a member of the task's project
+
+        # If assigned_to is being set, ensure the user can actually work on the task's project
+        # (CONTRIBUTOR or above - VIEWER is read-only, so not assignable)
         assigned_user = validated_data.get('assigned_to', None)
         if assigned_user is not None:
-            role = get_project_role(assigned_user, instance.project)
-            if role not in ["OWNER", "MANAGER", "MEMBER"]:
+            role = effective_role(assigned_user, instance.project)
+            if PROJECT_ROLE_HIERARCHY.get(role, -1) < PROJECT_ROLE_HIERARCHY["CONTRIBUTOR"]:
                 raise serializers.ValidationError("User is not a member of the task's project.")
 
         return super().update(instance, validated_data)

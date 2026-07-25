@@ -4,7 +4,7 @@ from app.projects.models import Project, ProjectMembership
 
 class ProjectFilter(django_filters.FilterSet):
     status = django_filters.CharFilter()
-    team = django_filters.CharFilter(field_name="team_id")
+    team = django_filters.CharFilter(field_name="team_links__team_id")
     
     class Meta:
         model = Project

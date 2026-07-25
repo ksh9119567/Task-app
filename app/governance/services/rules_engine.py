@@ -1,7 +1,6 @@
-from core.constants import (
-    ORG_ACTION_POLICIES, TEAM_ACTION_POLICIES, PROJECT_ACTION_POLICIES, 
-    ORG_ROLE_HIERARCHY, TEAM_ROLE_HIERARCHY, PROJECT_ROLE_HIERARCHY,
-)
+from core.constants.org_constant import ORG_ACTION_POLICIES, ORG_ROLE_HIERARCHY
+from core.constants.team_constant import TEAM_ACTION_POLICIES, TEAM_ROLE_HIERARCHY
+from core.constants.project_constant import PROJECT_ACTION_POLICIES, PROJECT_ROLE_HIERARCHY
 
 
 class GovernanceResolver:

@@ -1,9 +1,12 @@
+from core.constants.role_ladder import build_hierarchy
+
 PROJECT_ROLES = [
     ("OWNER", "Owner"),            # Full control of project
     ("MANAGER", "Manager"),        # Can manage tasks and members
     ('LEAD', 'Lead'),              # Can assign tasks
     ("CONTRIBUTOR", "Contributor"),# Can work on tasks
     ("VIEWER", "Viewer"),          # Can view everything
+    ("GUEST", "Guest"),            # External collaborator, lowest access
 ]
 
 PROJECT_STATUS = [
@@ -14,13 +17,7 @@ PROJECT_STATUS = [
     ("ARCHIVED", "Archived"),
 ]
 
-PROJECT_ROLE_HIERARCHY = {
-    "OWNER": 5,
-    "MANAGER": 4,
-    "LEAD": 3,
-    "CONTRIBUTOR": 2,
-    "VIEWER": 1,
-}
+PROJECT_ROLE_HIERARCHY = build_hierarchy(PROJECT_ROLES)
 
 PROJECT_ACTION_POLICIES = {
     "invite_member": {
@@ -42,13 +39,13 @@ PROJECT_ACTION_POLICIES = {
         "default": "MANAGER",
     },
     "create_task": {
-        "system_min_role": "MEMBER",
+        "system_min_role": "CONTRIBUTOR",
         "system_max_role": "MANAGER",
         "configurable": True,
         "default": "MANAGER",
     },
     "update_task": {
-        "system_min_role": "MEMBER",
+        "system_min_role": "CONTRIBUTOR",
         "system_max_role": "MANAGER",
         "configurable": True,
         "default": "MANAGER",

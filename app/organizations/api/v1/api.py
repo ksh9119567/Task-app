@@ -25,9 +25,11 @@ from app.organizations.services.organization_service import (
 
 from core.utils.base_utils import add_member, get_user
 from core.utils.org_utils import get_org, get_all_org_memberships
-from core.constants.org_constant import ORG_ROLE_HIERARCHY
+from core.constants.org_constant import ORG_ROLE_HIERARCHY, ORG_ACTION_POLICIES
 from core.permissions.base import get_org_role
-from core.permissions.mixins import RoleCheckerMixin
+
+from app.governance.services.rules_engine import GovernanceResolver
+from core.permissions.mixins import RoleCheckerMixin, EnforceObjectPermissionsMixin
 from core.permissions.organization import (
     IsOrganizationMember, IsOrganizationOwner, IsOrganizationPart, IsOrganizationManager
 )
@@ -38,7 +40,9 @@ from services.invite_token_service import verify_invite_token
 logger = logging.getLogger(__name__)
 
 
-class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
+class OrganizationAPI(
+        EnforceObjectPermissionsMixin, RoleCheckerMixin, viewsets.ModelViewSet
+    ):
     """
     Organization API (v1)
     """
@@ -61,7 +65,11 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
             permissions = [IsAuthenticated]
 
         return [permission() for permission in permissions]
-        
+    
+    def get_permission_object(self):
+        org_id = self.request.query_params.get("org_id")
+        return get_org(org_id) if org_id else None
+            
     def check_role_permissions(self, request, organization):
         role = get_org_role(request.user, organization)
         
@@ -72,24 +80,28 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         elif self.action == "send_invite":
             if organization.settings.allow_member_invites == False:
                 raise ValidationError("You are not allowed to invite members.")
-            
-            min_role_required = organization.settings.invite_member_min_role
+
+            policy_action = "invite_member"
         elif self.action == "update_member":
             if organization.settings.allow_member_updates == False:
                 raise ValidationError("You are not allowed to update members.")
-            
-            min_role_required = organization.settings.update_member_min_role
+
+            policy_action = "update_member"
         elif self.action == "remove_member":
             if organization.settings.allow_member_removal == False:
                 raise ValidationError("You are not allowed to remove members.")
-            
-            min_role_required = organization.settings.remove_member_min_role
+
+            policy_action = "remove_member"
         else:
             return
-        
+
+        # Clamp the configured minimum role to the action's system min/max bounds.
+        min_role_required = GovernanceResolver.resolve_action_min_role(
+            organization.settings, policy_action, ORG_ACTION_POLICIES, ORG_ROLE_HIERARCHY
+        )
         if not self.has_minimum_role(role, min_role_required, ORG_ROLE_HIERARCHY):
             raise ValidationError(f"You must have at least {min_role_required} role to perform this action.")
-        
+
         return True
     
     def get_serializer_class(self):
@@ -159,8 +171,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
     def retrieve(self, request):
         org_id = request.query_params.get("org_id")
         logger.info(f"Retrieving organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
         logger.debug(f"Organization retrieved: {org.name}")
         
         return Response({
@@ -172,8 +183,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
     def update(self, request):
         org_id = request.query_params.get("org_id")
         logger.info(f"Updating organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
 
         serializer_class = self.get_serializer_class()
         serializer = serializer_class(
@@ -195,8 +205,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
     def destroy(self, request):
         org_id = request.query_params.get("org_id")
         logger.info(f"Deleting organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
 
         delete_organization(
             organization=org,
@@ -216,8 +225,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
     def members(self, request):
         org_id = request.query_params.get("org_id")
         logger.info(f"Listing members for organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
 
         members = get_all_org_memberships(org.id)
 
@@ -233,8 +241,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
     def self_remove_member(self, request):
         org_id = request.query_params.get("org_id")
         logger.info(f"Self-remove from organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
 
         self_remove(
             organization=org,
@@ -252,8 +259,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         org_id = request.query_params.get("org_id")
         email = request.data.get("email")
         logger.info(f"Sending invite to {email} for organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
         self.check_role_permissions(request, org)
                 
         serializer_class = self.get_serializer_class()
@@ -302,8 +308,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         org_id = request.query_params.get("org_id")
         email = request.data.get("email")
         logger.info(f"Updating member {email} in organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
         self.check_role_permissions(request, org)
         
         target_user = get_user(email, kind="email")
@@ -340,8 +345,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         org_id = request.query_params.get("org_id")
         email = request.data.get("email")
         logger.info(f"Transferring ownership of organization: {org_id} to {email} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
 
         new_owner = get_user(email, kind="email")
         if not new_owner:
@@ -365,8 +369,7 @@ class OrganizationAPI(viewsets.ModelViewSet, RoleCheckerMixin):
         org_id = request.query_params.get("org_id")
         email = request.data.get("email")
         logger.info(f"Removing member {email} from organization: {org_id} by user: {request.user.email}")
-        org = get_org(org_id)
-        self.check_object_permissions(request, org)
+        org = self.permission_object
         self.check_role_permissions(request, org)
         
         user = get_user(email, kind="email")

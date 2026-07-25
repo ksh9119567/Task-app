@@ -43,10 +43,7 @@ def get_team_membership(team_id, user):
     """
     if team_id and user:
         try:
-            obj = TeamMembership.objects.get(team_id=team_id, user=user)
-            if not obj:
-                raise ValidationError("User is not a member of this team")
-            return obj
-        except Exception as e:
-            raise Exception(e)
+            return TeamMembership.objects.get(team_id=team_id, user=user)
+        except TeamMembership.DoesNotExist:
+            raise NotFound("Team membership not found")
     raise ValidationError("Team ID and user are required")
