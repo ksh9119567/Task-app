@@ -13,14 +13,15 @@ REDIS_KEY_PREFIX = "refresh:"
 REDIS_ACCESS_TOKEN_PREFIX = "access:"
 REDIS_USER_SESSIONS_PREFIX = "user_sessions:"
 
-def store_refresh_token(user_id, refresh_token):
+def store_refresh_token(user_id, refresh_token, ttl=None):
     """Store refresh token in Redis with expiry."""
     logger.debug(f"Storing refresh token for user {user_id}")
     # prefer configured lifetime if available
-    try:
-        ttl = int(settings.SIMPLE_JWT.get("REFRESH_TOKEN_LIFETIME", timedelta(days=7)).total_seconds())
-    except Exception:
-        ttl = int(timedelta(days=7).total_seconds())
+    if ttl is None:    
+        try:
+            ttl = int(settings.SIMPLE_JWT.get("REFRESH_TOKEN_LIFETIME", timedelta(days=1)).total_seconds())
+        except Exception:
+            ttl = int(timedelta(days=1).total_seconds())
     key = f"{REDIS_KEY_PREFIX}{refresh_token}"
     settings.REDIS_CLIENT.setex(key, ttl, str(user_id))
     logger.info(f"Refresh token stored successfully for user {user_id}")
