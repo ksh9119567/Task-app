@@ -1,8 +1,14 @@
 import re
+from datetime import timedelta
 
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.serializers import (
+    TokenObtainPairSerializer, TokenObtainSerializer, TokenRefreshSerializer
+)
 
+from django.conf import settings
+from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 
 from app.accounts.models import User
@@ -65,6 +71,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    remember_me = serializers.BooleanField(default=False, required=False, write_only=True)
+    
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -72,6 +80,47 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['email'] = user.email
         token['username'] = user.username
         return token
+    
+    def validate(self, attrs):
+        data = TokenObtainSerializer.validate(self, attrs)
+        remember_me = attrs.get('remember_me', False)
+        refresh = self.get_token(self.user)
+        refresh['remember_me'] = remember_me
+        lifetime = (
+            settings.SIMPLE_JWT['REFRESH_TOKEN_REMEMBER_ME_LIFETIME']
+            if remember_me else
+            settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME']
+        )
+        refresh.set_exp(lifetime=lifetime)
+        data['refresh'] = str(refresh)
+        data['access'] = str(refresh.access_token)
+        if api_settings.UPDATE_LAST_LOGIN:
+            update_last_login(None, self.user)
+        return data
+    
+
+class CustomTokenRefreshSerializer(TokenRefreshSerializer):
+    def validate(self, attrs):
+        refresh = self.token_class(attrs['refresh'])
+        remember_me = bool(refresh.get('remember_me', False))
+        data = {'access': str(refresh.access_token)}
+        if api_settings.ROTATE_REFRESH_TOKENS:
+            if api_settings.BLACKLIST_AFTER_ROTATION:
+                try:
+                    refresh.blacklist()
+                except AttributeError:
+                    pass
+            refresh.set_jti()
+            refresh.set_iat()
+            lifetime = (
+                settings.SIMPLE_JWT['REFRESH_TOKEN_REMEMBER_ME_LIFETIME']
+                if remember_me else
+                settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME']
+            )
+            refresh.set_exp(lifetime=lifetime)
+            refresh['remember_me'] = remember_me
+            data['refresh'] = str(refresh)
+        return data
 
 
 class GetOTPSerializer(serializers.Serializer):

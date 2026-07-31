@@ -1,4 +1,5 @@
 import logging
+import time
 
 from rest_framework import status, permissions
 from rest_framework.views import APIView
@@ -10,9 +11,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from app.accounts.api.v1.serializers import (
-    RegisterSerializer, UserSerializer, UserUpdateSerializer, CustomTokenObtainPairSerializer, 
-    GetOTPSerializer, VerifyOTPSerializer, ForgotPasswordRequestSerializer, 
-    ForgotPasswordVerifySerializer, ForgotPasswordResetSerializer, 
+    CustomTokenRefreshSerializer, RegisterSerializer, UserSerializer, UserUpdateSerializer, 
+    CustomTokenObtainPairSerializer, GetOTPSerializer, VerifyOTPSerializer, 
+    ForgotPasswordRequestSerializer, ForgotPasswordVerifySerializer, ForgotPasswordResetSerializer, 
 )
 from app.accounts.services.user_service import delete_user_account
 from app.accounts.services.auth_service import login_user, logout_user
@@ -68,7 +69,8 @@ class LoginAPI(TokenObtainPairView):
                     token_obj = RefreshToken(refresh_token)
                     uid = token_obj.get('user_id') or token_obj.get('user')
                     if uid:
-                        store_refresh_token(uid, refresh_token)
+                        ttl = max(int(token_obj['exp'] - time.time()), 1)
+                        store_refresh_token(uid, refresh_token, ttl=ttl)
                         if access_token:
                             store_access_token(uid, access_token)
                         logger.info(f"User logged in successfully, user_id: {uid}")
@@ -79,6 +81,8 @@ class LoginAPI(TokenObtainPairView):
                 
 
 class RefreshAPI(TokenRefreshView):
+    serializer_class = CustomTokenRefreshSerializer
+    
     def post(self, request):
         logger.info("Token refresh attempt")
         old_refresh = request.data.get("refresh")
@@ -96,7 +100,8 @@ class RefreshAPI(TokenRefreshView):
         if new_refresh:
             token = RefreshToken(new_refresh)
             uid = token["user_id"]
-            store_refresh_token(uid, new_refresh)
+            ttl = max(int(token['exp'] - time.time()), 1)
+            store_refresh_token(uid, new_refresh, ttl=ttl)
             if new_access:
                 store_access_token(uid, new_access)
             delete_refresh_token(old_refresh)
